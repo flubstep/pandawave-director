@@ -20,37 +20,53 @@ interface GpsPosition {
   yvel: number;
 }
 
+interface WorldPosition extends GpsPosition {
+  world: THREE.Vector3;
+}
+
 async function loadJsonUrl<T>(url: string): Promise<T> {
   const response = await fetch(url);
   const json = await response.json();
   return json;
 }
 
-async function loadLidarFrames(frameId: string): Promise<THREE.Group> {
-  const frameBaseUrl = `http://localhost:8080/pandaset_0/${frameId}`;
-  const timestamps = await loadJsonUrl<number[]>(frameBaseUrl + `/meta/timestamps.json`);
-  const positions = await loadJsonUrl<GpsPosition[]>(frameBaseUrl + `/meta/gps.json`);
-  const frameNumbers = timestamps.map((_, n) => String(n).padStart(2, '0'));
-  const timeScale = 20000.0;
-
+async function loadPositions(url: string): Promise<WorldPosition[]> {
+  const positions = await loadJsonUrl<GpsPosition[]>(url);
   const latlongToMeters = 111139;
+  const positionZero = positions[0];
+  const worldPositions = positions.map((position) => ({
+    ...position,
+    world: new THREE.Vector3(
+      (position.lat - positionZero.lat) * latlongToMeters,
+      (position.long - positionZero.long) * latlongToMeters,
+      position.height - positionZero.height,
+    ),
+  }));
+  return worldPositions;
+}
 
+async function loadLidarFrames({
+  scene,
+  timestamps,
+  positions,
+}: {
+  scene: string;
+  timestamps: number[];
+  positions: WorldPosition[];
+}): Promise<THREE.Group> {
+  const frameBaseUrl = `http://localhost:8080/pandaset_0/${scene}`;
+  const frameNumbers = timestamps.map((_, n) => String(n).padStart(2, '0'));
   const group = new THREE.Group();
   for (const [frameNumber, timestamp, position] of _.zip(frameNumbers, timestamps, positions)) {
     if (!timestamp || !position) {
       continue;
     }
     const timestampZero = timestamps[0];
-    const positionZero = positions[0];
-    const deltaPosition = new THREE.Vector3(
-      (position.lat - positionZero.lat) * latlongToMeters,
-      (position.long - positionZero.long) * latlongToMeters,
-      position.height - positionZero.height,
-    );
+    const deltaPosition = position.world;
     const url = frameBaseUrl + `/lidar_bin/${frameNumber}.bin`;
     const frame = await loadFrame({
       url,
-      timestamp: (timestamp - timestampZero) * timeScale,
+      timestamp: timestamp - timestampZero,
       origin: deltaPosition,
     });
     group.add(frame);
@@ -77,16 +93,36 @@ async function loadFrame({
     fragmentShader: FRAGMENT_SHADER,
     uniforms: {
       size: { value: 4.0 },
-      timeStart: { value: timestamp / 1000.0 },
+      timeStart: { value: timestamp },
       timeDelta: { value: 0.0 },
       lidarOrigin: { value: origin },
-      lidarSpeed: { value: 30.0 },
-      decayTime: { value: 2.0 },
+      lidarSpeed: { value: 120.0 },
+      decayTime: { value: 0.3 },
     },
     transparent: true,
   });
   const mesh = new THREE.Points(geometry, material);
   return mesh;
+}
+
+function getTrackPositionAt(
+  timestamps: number[],
+  positions: WorldPosition[],
+  dt: number,
+): THREE.Vector3 {
+  for (let ii = 0; ii < timestamps.length - 1; ii++) {
+    const t1 = timestamps[ii] - timestamps[0];
+    const t2 = timestamps[ii + 1] - timestamps[0];
+    if (t1 <= dt && dt <= t2) {
+      const p1 = positions[ii].world;
+      const p2 = positions[ii + 1].world;
+      const fraction = (dt - t1) / (t2 - t1);
+      const position = new THREE.Vector3();
+      position.lerpVectors(p1, p2, fraction);
+      return position;
+    }
+  }
+  return positions[positions.length - 1].world;
 }
 
 async function setupThreeScene(container: HTMLDivElement): Promise<() => void> {
@@ -100,19 +136,19 @@ async function setupThreeScene(container: HTMLDivElement): Promise<() => void> {
   renderer.setPixelRatio(window.devicePixelRatio);
   container.appendChild(renderer.domElement);
 
+  const lidarScene = '001';
+  const frameBaseUrl = `http://localhost:8080/pandaset_0/${lidarScene}`;
+
+  const timestamps = await loadJsonUrl<number[]>(frameBaseUrl + `/meta/timestamps.json`); // timestamps are in seconds
+  const duration = timestamps[timestamps.length - 1] - timestamps[0];
+  const positions = await loadPositions(frameBaseUrl + `/meta/gps.json`);
+
   const geometry = new THREE.BoxGeometry();
-  const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+  const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
   const cube = new THREE.Mesh(geometry, material);
   scene.add(cube);
 
-  const light = new THREE.PointLight(0xffffff, 1);
-  light.position.set(0, 0, 5);
-  const light2 = new THREE.PointLight(0xffffff, 0.5);
-  light2.position.set(0, 5, 0);
-  const light3 = new THREE.AmbientLight(0xffffff, 0.1);
-  scene.add(light, light2, light3);
-
-  camera.position.z = 5;
+  camera.position.z = 20;
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.object.up.set(0, 0, 1);
@@ -122,19 +158,30 @@ async function setupThreeScene(container: HTMLDivElement): Promise<() => void> {
     RIGHT: THREE.MOUSE.ROTATE,
   };
 
-  const frames = await loadLidarFrames('001');
+  const frames = await loadLidarFrames({
+    scene: lidarScene,
+    timestamps,
+    positions,
+  });
   scene.add(frames);
 
   let animationPointer: number | null = null;
+  const timeScale = 1 / 12;
 
   function animate(timeMs: number): void {
     animationPointer = requestAnimationFrame(animate);
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
     renderer.render(scene, camera);
+    const timeDelta = ((timeMs / 1000.0) * timeScale) % duration;
     for (const frame of frames.children) {
-      frame.material.uniforms.timeDelta.value = (timeMs / 1000.0) % 20.0;
+      frame.material.uniforms.timeDelta.value = timeDelta;
     }
+    const carPosition = getTrackPositionAt(timestamps, positions, timeDelta);
+    cube.position.set(carPosition.x, carPosition.y, carPosition.z);
+    camera.position.x = cube.position.x;
+    camera.position.y = cube.position.y;
+    camera.lookAt(cube.position);
   }
 
   window.addEventListener('resize', () => {

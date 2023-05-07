@@ -34,6 +34,5 @@ void main() {
   if(timeDelta < arrivalTime) {
     alpha = 0.0;
   }
-
   v_heightColor = vec4(color, alpha);
 }
