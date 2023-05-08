@@ -53,6 +53,8 @@ export async function setupThreeScene(
       positions,
     });
     scene.add(frames);
+    playStatus.playing = true;
+    playStatus.timeDelta = 0.0;
     pandaScene = {
       name,
       timestamps,
@@ -95,26 +97,37 @@ export async function setupThreeScene(
     lidarSpeed: 120.0,
     decayTime: 0.15,
   };
+  const playStatus = {
+    playing: false,
+    timeDelta: 0.0,
+  };
 
-  function animate(timeMs: number): void {
+  const clock = new THREE.Clock();
+  function animate(): void {
     animationPointer = requestAnimationFrame(animate);
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
     renderer.render(scene, camera);
-    if (pandaScene) {
-      const { frames, positions, timestamps } = pandaScene;
-      const duration = timestamps[timestamps.length - 1] - timestamps[0];
-      const timeDelta = ((timeMs / 1000.0) * params.timeScale) % duration;
-      for (const frame of frames.children) {
-        frame.material.uniforms.timeDelta.value = timeDelta;
-      }
-      const carPosition = getTrackPositionAt(timestamps, positions, timeDelta);
-      cube.position.set(carPosition.x, carPosition.y, carPosition.z);
-      if (params.followCar) {
-        camera.position.x = cube.position.x;
-        camera.position.y = cube.position.y;
-        camera.lookAt(cube.position);
-      }
+    if (!pandaScene) {
+      return;
+    }
+    if (!playStatus.playing) {
+      return;
+    }
+    const { frames, positions, timestamps } = pandaScene;
+    const duration = timestamps[timestamps.length - 1] - timestamps[0];
+    const dt = clock.getDelta();
+    playStatus.timeDelta += dt * params.timeScale;
+    playStatus.timeDelta = playStatus.timeDelta % duration;
+    for (const frame of frames.children) {
+      frame.material.uniforms.timeDelta.value = playStatus.timeDelta;
+    }
+    const carPosition = getTrackPositionAt(timestamps, positions, playStatus.timeDelta);
+    cube.position.set(carPosition.x, carPosition.y, carPosition.z);
+    if (params.followCar) {
+      camera.position.x = cube.position.x;
+      camera.position.y = cube.position.y;
+      camera.lookAt(cube.position);
     }
   }
 
@@ -172,7 +185,9 @@ export async function setupThreeScene(
     .name('Decay Time (s)')
     .onChange(updateUniforms);
   shaderGui.open();
-  gui.add({ stop: () => unloadPandaScene() }, 'stop').name('Stop Scene Playback');
+  gui.add(playStatus, 'playing').name('Playing');
+  gui.add(playStatus, 'timeDelta').name('Timestamp');
+  gui.add({ stop: () => unloadPandaScene() }, 'stop').name('Unload Current Scene');
   guiContainer.appendChild(gui.domElement);
 
   animate(0.0);
