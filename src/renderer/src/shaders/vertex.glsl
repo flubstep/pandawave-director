@@ -1,4 +1,6 @@
 uniform float size;
+uniform float zMin;
+uniform float zMax;
 uniform float timeStart; // seconds
 uniform float timeDelta; // seconds
 uniform vec3 lidarOrigin;
@@ -8,8 +10,6 @@ uniform float decayTime;  // seconds
 varying vec4 v_heightColor;
 
 void main() {
-  float zMin = -2.0;
-  float zMax = 5.0;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   gl_PointSize = max(size, size / gl_Position.w);
 
