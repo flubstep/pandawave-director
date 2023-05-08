@@ -1,131 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { GUI } from 'dat.gui';
-import _ from 'lodash';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 import { Box, ChakraProvider, DarkMode, extendTheme } from '@chakra-ui/react';
 
-import FRAGMENT_SHADER from './shaders/fragment.glsl';
-import VERTEX_SHADER from './shaders/vertex.glsl';
+import { loadCameraPositions, loadJsonUrl, loadLidarFrames, PandaScene } from './utils/lidar';
 
 const DEFAULT_PANEL_WIDTH = 240;
 const VIDEO_ASPECT_RATIO = 16 / 9;
-
-interface GpsPosition {
-  lat: number;
-  long: number;
-  height: number;
-  xvel: number;
-  yvel: number;
-}
-
-interface WorldPosition extends GpsPosition {
-  world: THREE.Vector3;
-}
-
-interface CameraPose {
-  position: {
-    x: number;
-    y: number;
-    z: number;
-  };
-  heading: {
-    x: number;
-    y: number;
-    z: number;
-    w: number;
-  };
-}
-
-async function loadJsonUrl<T>(url: string): Promise<T> {
-  const response = await fetch(url);
-  const json = await response.json();
-  return json;
-}
-
-async function loadGpsPositions(url: string): Promise<WorldPosition[]> {
-  const positions = await loadJsonUrl<GpsPosition[]>(url);
-  const latlongToMeters = 111139;
-  const positionZero = positions[0];
-  const worldPositions = positions.map((position) => ({
-    ...position,
-    world: new THREE.Vector3(
-      (position.lat - positionZero.lat) * latlongToMeters,
-      (position.long - positionZero.long) * latlongToMeters,
-      position.height - positionZero.height,
-    ),
-  }));
-  return worldPositions;
-}
-
-async function loadCameraPositions(url: string): Promise<THREE.Vector3[]> {
-  const poses = await loadJsonUrl<CameraPose[]>(url);
-  return poses.map((pose) => new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z));
-}
-
-async function loadLidarFrames({
-  scene,
-  timestamps,
-  positions,
-}: {
-  scene: string;
-  timestamps: number[];
-  positions: THREE.Vector3[];
-}): Promise<THREE.Group> {
-  const frameBaseUrl = `http://localhost:8080/pandaset_0/${scene}`;
-  const frameNumbers = timestamps.map((_, n) => String(n).padStart(2, '0'));
-  const group = new THREE.Group();
-  for (const [frameNumber, timestamp, position] of _.zip(frameNumbers, timestamps, positions)) {
-    if (!timestamp || !position) {
-      continue;
-    }
-    const timestampZero = timestamps[0];
-    const deltaPosition = position;
-    const url = frameBaseUrl + `/lidar_bin/${frameNumber}.bin`;
-    const frame = await loadFrame({
-      url,
-      timestamp: timestamp - timestampZero,
-      origin: deltaPosition,
-    });
-    group.add(frame);
-  }
-  return group;
-}
-
-async function loadFrame({
-  url,
-  timestamp,
-  origin,
-}: {
-  url: string;
-  timestamp: number;
-  origin: THREE.Vector3;
-}): Promise<THREE.Object3D> {
-  const response = await fetch(url);
-  const buffer = await response.arrayBuffer();
-  const vertices = new Float32Array(buffer);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-  const material = new THREE.ShaderMaterial({
-    vertexShader: VERTEX_SHADER,
-    fragmentShader: FRAGMENT_SHADER,
-    uniforms: {
-      size: { value: 4.0 },
-      zMin: { value: -2.0 },
-      zMax: { value: 5.0 },
-      timeStart: { value: timestamp },
-      timeDelta: { value: 0.0 },
-      lidarOrigin: { value: origin },
-      lidarSpeed: { value: 120.0 },
-      decayTime: { value: 0.15 },
-    },
-    transparent: true,
-  });
-  const mesh = new THREE.Points(geometry, material);
-  return mesh;
-}
 
 function getTrackPositionAt(
   timestamps: number[],
@@ -161,13 +45,35 @@ async function setupThreeScene(
   renderer.setPixelRatio(window.devicePixelRatio);
   container.appendChild(renderer.domElement);
 
-  const lidarScene = '006';
-  const frameBaseUrl = `http://localhost:8080/pandaset_0/${lidarScene}`;
-
-  const timestamps = await loadJsonUrl<number[]>(frameBaseUrl + `/meta/timestamps.json`); // timestamps are in seconds
-  const duration = timestamps[timestamps.length - 1] - timestamps[0];
-  //const positions = await loadPositions(frameBaseUrl + `/meta/gps.json`, timestamps);
-  const positions = await loadCameraPositions(frameBaseUrl + '/camera/front_camera/poses.json');
+  let pandaScene: PandaScene | null = null;
+  async function loadPandaScene(name: string): Promise<void> {
+    if (pandaScene) {
+      scene.remove(pandaScene.frames);
+    }
+    const frameBaseUrl = `http://localhost:8080/pandaset_0/${name}`;
+    const timestamps = await loadJsonUrl<number[]>(frameBaseUrl + `/meta/timestamps.json`); // timestamps are in seconds
+    const positions = await loadCameraPositions(frameBaseUrl + '/camera/front_camera/poses.json');
+    const frames = await loadLidarFrames({
+      scene: name,
+      timestamps,
+      positions,
+    });
+    scene.add(frames);
+    pandaScene = {
+      name,
+      timestamps,
+      positions,
+      frames,
+    };
+  }
+  async function unloadPandaScene(): Promise<void> {
+    if (!pandaScene) {
+      return;
+    }
+    scene.remove(pandaScene.frames);
+    pandaScene = null;
+  }
+  await loadPandaScene('006');
 
   const geometry = new THREE.BoxGeometry();
   const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
@@ -183,13 +89,6 @@ async function setupThreeScene(
     MIDDLE: THREE.MOUSE.DOLLY,
     RIGHT: THREE.MOUSE.ROTATE,
   };
-
-  const frames = await loadLidarFrames({
-    scene: lidarScene,
-    timestamps,
-    positions,
-  });
-  scene.add(frames);
 
   let animationPointer: number | null = null;
 
@@ -209,20 +108,28 @@ async function setupThreeScene(
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
     renderer.render(scene, camera);
-    const timeDelta = ((timeMs / 1000.0) * params.timeScale) % duration;
-    for (const frame of frames.children) {
-      frame.material.uniforms.timeDelta.value = timeDelta;
-    }
-    const carPosition = getTrackPositionAt(timestamps, positions, timeDelta);
-    cube.position.set(carPosition.x, carPosition.y, carPosition.z);
-    if (params.followCar) {
-      camera.position.x = cube.position.x;
-      camera.position.y = cube.position.y;
-      camera.lookAt(cube.position);
+    if (pandaScene) {
+      const { frames, positions, timestamps } = pandaScene;
+      const duration = timestamps[timestamps.length - 1] - timestamps[0];
+      const timeDelta = ((timeMs / 1000.0) * params.timeScale) % duration;
+      for (const frame of frames.children) {
+        frame.material.uniforms.timeDelta.value = timeDelta;
+      }
+      const carPosition = getTrackPositionAt(timestamps, positions, timeDelta);
+      cube.position.set(carPosition.x, carPosition.y, carPosition.z);
+      if (params.followCar) {
+        camera.position.x = cube.position.x;
+        camera.position.y = cube.position.y;
+        camera.lookAt(cube.position);
+      }
     }
   }
 
   function updateUniforms(): void {
+    if (!pandaScene) {
+      return;
+    }
+    const { frames } = pandaScene;
     for (const frame of frames.children) {
       frame.material.uniforms.zMin.value = shaderParams.zMin;
       frame.material.uniforms.zMax.value = shaderParams.zMax;
@@ -242,6 +149,20 @@ async function setupThreeScene(
   const gui = new GUI({ autoPlace: false });
   gui.width = DEFAULT_PANEL_WIDTH;
 
+  const availableScenes: { [name: string]: () => Promise<void> } = {
+    '001': () => loadPandaScene('001'),
+    '002': () => loadPandaScene('002'),
+    '003': () => loadPandaScene('003'),
+    '004': () => loadPandaScene('004'),
+    '005': () => loadPandaScene('005'),
+    '006': () => loadPandaScene('006'),
+  };
+  const sceneGui = gui.addFolder('Load Scene');
+  for (const name of Object.keys(availableScenes)) {
+    sceneGui.add(availableScenes, name).name(`Pandaset Scene ${name}`);
+  }
+  sceneGui.open();
+
   const cameraGui = gui.addFolder('Camera Options');
   cameraGui.add(params, 'timeScale', 0.0, 1.0, 0.01).name('Time Scale');
   cameraGui.add(params, 'followCar').name('Auto Follow Car');
@@ -258,6 +179,7 @@ async function setupThreeScene(
     .name('Decay Time (s)')
     .onChange(updateUniforms);
   shaderGui.open();
+  gui.add({ stop: () => unloadPandaScene() }, 'stop').name('Stop Scene Playback');
   guiContainer.appendChild(gui.domElement);
 
   animate(0.0);
