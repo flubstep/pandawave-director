@@ -5,7 +5,7 @@ import _ from 'lodash';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
-import { Box, Button, ChakraProvider, DarkMode, extendTheme, Text } from '@chakra-ui/react';
+import { Box, ChakraProvider, DarkMode, extendTheme } from '@chakra-ui/react';
 
 import FRAGMENT_SHADER from './shaders/fragment.glsl';
 import VERTEX_SHADER from './shaders/vertex.glsl';
@@ -25,31 +25,28 @@ interface WorldPosition extends GpsPosition {
   world: THREE.Vector3;
 }
 
+interface CameraPose {
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  heading: {
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+  };
+}
+
 async function loadJsonUrl<T>(url: string): Promise<T> {
   const response = await fetch(url);
   const json = await response.json();
   return json;
 }
 
-async function loadPositions(url: string, timestamps: number[]): Promise<WorldPosition[]> {
+async function loadGpsPositions(url: string): Promise<WorldPosition[]> {
   const positions = await loadJsonUrl<GpsPosition[]>(url);
-  /*
-  const lastPosition = new THREE.Vector2(0, 0);
-  const worldPositions: WorldPosition[] = [];
-  for (let ii = 0; ii < positions.length; ii++) {
-    const position = positions[ii];
-    const world = new THREE.Vector3(lastPosition.x, lastPosition.y, position.height);
-    worldPositions.push({
-      ...position,
-      world,
-    });
-    if (ii < positions.length - 1) {
-      const dtime = timestamps[ii + 1] - timestamps[ii];
-      lastPosition.x += position.xvel * dtime;
-      lastPosition.y += position.yvel * dtime;
-    }
-  }
-  */
   const latlongToMeters = 111139;
   const positionZero = positions[0];
   const worldPositions = positions.map((position) => ({
@@ -63,6 +60,11 @@ async function loadPositions(url: string, timestamps: number[]): Promise<WorldPo
   return worldPositions;
 }
 
+async function loadCameraPositions(url: string): Promise<THREE.Vector3[]> {
+  const poses = await loadJsonUrl<CameraPose[]>(url);
+  return poses.map((pose) => new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z));
+}
+
 async function loadLidarFrames({
   scene,
   timestamps,
@@ -70,7 +72,7 @@ async function loadLidarFrames({
 }: {
   scene: string;
   timestamps: number[];
-  positions: WorldPosition[];
+  positions: THREE.Vector3[];
 }): Promise<THREE.Group> {
   const frameBaseUrl = `http://localhost:8080/pandaset_0/${scene}`;
   const frameNumbers = timestamps.map((_, n) => String(n).padStart(2, '0'));
@@ -80,7 +82,7 @@ async function loadLidarFrames({
       continue;
     }
     const timestampZero = timestamps[0];
-    const deltaPosition = position.world;
+    const deltaPosition = position;
     const url = frameBaseUrl + `/lidar_bin/${frameNumber}.bin`;
     const frame = await loadFrame({
       url,
@@ -127,23 +129,22 @@ async function loadFrame({
 
 function getTrackPositionAt(
   timestamps: number[],
-  positions: WorldPosition[],
+  positions: THREE.Vector3[],
   dt: number,
 ): THREE.Vector3 {
   for (let ii = 0; ii < timestamps.length - 1; ii++) {
     const t1 = timestamps[ii] - timestamps[0];
     const t2 = timestamps[ii + 1] - timestamps[0];
     if (t1 <= dt && dt < t2) {
-      const p1 = positions[ii].world;
-      const p2 = positions[ii + 1].world;
+      const p1 = positions[ii];
+      const p2 = positions[ii + 1];
       const fraction = (dt - t1) / (t2 - t1);
       const position = new THREE.Vector3();
       position.lerpVectors(p1, p2, fraction);
-      //return position;
-      return p1;
+      return position;
     }
   }
-  return positions[positions.length - 1].world;
+  return positions[positions.length - 1];
 }
 
 async function setupThreeScene(
@@ -165,7 +166,8 @@ async function setupThreeScene(
 
   const timestamps = await loadJsonUrl<number[]>(frameBaseUrl + `/meta/timestamps.json`); // timestamps are in seconds
   const duration = timestamps[timestamps.length - 1] - timestamps[0];
-  const positions = await loadPositions(frameBaseUrl + `/meta/gps.json`, timestamps);
+  //const positions = await loadPositions(frameBaseUrl + `/meta/gps.json`, timestamps);
+  const positions = await loadCameraPositions(frameBaseUrl + '/camera/front_camera/poses.json');
 
   const geometry = new THREE.BoxGeometry();
   const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
