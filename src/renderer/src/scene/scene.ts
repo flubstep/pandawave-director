@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 import { DEFAULT_PANEL_WIDTH, VIDEO_ASPECT_RATIO } from '../constants';
+import { usePlaybackStore } from '../stores/playbackStore';
 import { loadCameraPositions, loadJsonUrl, loadLidarFrames, PandaScene } from './loaders';
 
 function getTrackPositionAt(
@@ -87,6 +88,11 @@ export async function setupThreeScene(
 
   let animationPointer: number | null = null;
 
+  usePlaybackStore.subscribe((state) => {
+    playStatus.playing = state.playing;
+    playStatus.timeDelta = state.timestamp;
+  });
+
   const params = {
     timeScale: 1 / 12.0,
     followCar: false,
@@ -104,6 +110,7 @@ export async function setupThreeScene(
 
   const clock = new THREE.Clock();
   function animate(): void {
+    const dt = clock.getDelta();
     animationPointer = requestAnimationFrame(animate);
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
@@ -116,9 +123,10 @@ export async function setupThreeScene(
     }
     const { frames, positions, timestamps } = pandaScene;
     const duration = timestamps[timestamps.length - 1] - timestamps[0];
-    const dt = clock.getDelta();
     playStatus.timeDelta += dt * params.timeScale;
     playStatus.timeDelta = playStatus.timeDelta % duration;
+    usePlaybackStore.getState().setTimestamp(playStatus.timeDelta);
+
     for (const frame of frames.children) {
       frame.material.uniforms.timeDelta.value = playStatus.timeDelta;
     }
@@ -128,6 +136,7 @@ export async function setupThreeScene(
       camera.position.x = cube.position.x;
       camera.position.y = cube.position.y;
       camera.lookAt(cube.position);
+      controls.position0 = cube.position;
     }
   }
 

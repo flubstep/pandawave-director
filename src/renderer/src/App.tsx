@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
-import { Box, ChakraProvider, DarkMode, extendTheme, Text } from '@chakra-ui/react';
+import { Box, Button, ChakraProvider, DarkMode, extendTheme, Text } from '@chakra-ui/react';
 
 import { DEFAULT_PANEL_WIDTH } from './constants';
 import { setupThreeScene } from './scene';
+import { usePlaybackStore } from './stores/playbackStore';
 
 const config = {
   initialColorMode: 'dark',
@@ -16,6 +17,8 @@ function App(): JSX.Element {
   const [panelWidth] = useState<number>(DEFAULT_PANEL_WIDTH);
   const canvasContainer = useRef<HTMLDivElement>(null);
   const guiPanel = useRef<HTMLDivElement>(null);
+
+  const { timestamp, playing, setPlaying } = usePlaybackStore();
 
   useEffect(() => {
     if (canvasContainer.current && guiPanel.current) {
@@ -57,7 +60,12 @@ function App(): JSX.Element {
                 alignItems="center"
                 justifyContent="center"
               >
-                <Text>Play</Text>
+                {playing ? (
+                  <Button onClick={() => setPlaying(false)}>Pause</Button>
+                ) : (
+                  <Button onClick={() => setPlaying(true)}>Play</Button>
+                )}
+                <Text>Current timestamp: {timestamp}</Text>
               </Box>
             </Box>
           </Box>
