@@ -54,8 +54,9 @@ export async function setupThreeScene(
       positions,
     });
     scene.add(frames);
-    playStatus.playing = true;
-    playStatus.timeDelta = 0.0;
+    const { setPlaying, setTimestamp } = usePlaybackStore.getState();
+    setPlaying(true);
+    setTimestamp(0.0);
     pandaScene = {
       name,
       timestamps,
@@ -88,11 +89,6 @@ export async function setupThreeScene(
 
   let animationPointer: number | null = null;
 
-  usePlaybackStore.subscribe((state) => {
-    playStatus.playing = state.playing;
-    playStatus.timeDelta = state.timestamp;
-  });
-
   const params = {
     timeScale: 1 / 12.0,
     followCar: false,
@@ -102,10 +98,6 @@ export async function setupThreeScene(
     zMax: 5.0,
     lidarSpeed: 120.0,
     decayTime: 0.15,
-  };
-  const playStatus = {
-    playing: false,
-    timeDelta: 0.0,
   };
 
   const clock = new THREE.Clock();
@@ -118,19 +110,21 @@ export async function setupThreeScene(
     if (!pandaScene) {
       return;
     }
-    if (!playStatus.playing) {
+    const { playing, timestamp, setTimestamp } = usePlaybackStore.getState();
+    if (!playing) {
       return;
     }
     const { frames, positions, timestamps } = pandaScene;
     const duration = timestamps[timestamps.length - 1] - timestamps[0];
-    playStatus.timeDelta += dt * params.timeScale;
-    playStatus.timeDelta = playStatus.timeDelta % duration;
-    usePlaybackStore.getState().setTimestamp(playStatus.timeDelta);
+    setTimestamp((timestamp + dt * params.timeScale) % duration);
+
+    // TODO: Make cleaner
+    const timeDelta = usePlaybackStore.getState().timestamp;
 
     for (const frame of frames.children) {
-      frame.material.uniforms.timeDelta.value = playStatus.timeDelta;
+      frame.material.uniforms.timeDelta.value = timeDelta;
     }
-    const carPosition = getTrackPositionAt(timestamps, positions, playStatus.timeDelta);
+    const carPosition = getTrackPositionAt(timestamps, positions, timeDelta);
     cube.position.set(carPosition.x, carPosition.y, carPosition.z);
     if (params.followCar) {
       camera.position.x = cube.position.x;
@@ -194,12 +188,10 @@ export async function setupThreeScene(
     .name('Decay Time (s)')
     .onChange(updateUniforms);
   shaderGui.open();
-  gui.add(playStatus, 'playing').name('Playing');
-  gui.add(playStatus, 'timeDelta').name('Timestamp');
   gui.add({ stop: () => unloadPandaScene() }, 'stop').name('Unload Current Scene');
   guiContainer.appendChild(gui.domElement);
 
-  animate(0.0);
+  animate();
   return () => {
     if (animationPointer) {
       cancelAnimationFrame(animationPointer);

@@ -50,22 +50,32 @@ function App(): JSX.Element {
             display="flex"
             flexDirection="column-reverse"
           >
-            <Box flexGrow={1} borderTop="1px solid #333" display="flex">
+            <Box
+              flexGrow={1}
+              borderTop="1px solid #333"
+              display="flex"
+              flexDirection="column"
+              color="white"
+            >
               <Box
-                flexGrow={1}
                 height={10}
-                bg="gray.700"
                 borderBottom="1px solid #333"
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
               >
                 {playing ? (
-                  <Button onClick={() => setPlaying(false)}>Pause</Button>
+                  <Button size="xs" onClick={() => setPlaying(false)}>
+                    Pause
+                  </Button>
                 ) : (
-                  <Button onClick={() => setPlaying(true)}>Play</Button>
+                  <Button size="xs" onClick={() => setPlaying(true)}>
+                    Play
+                  </Button>
                 )}
-                <Text>Current timestamp: {timestamp}</Text>
+              </Box>
+              <Box>
+                <Text>Current timestamp: {(timestamp % 1000).toFixed(4)} seconds</Text>
               </Box>
             </Box>
           </Box>
