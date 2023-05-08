@@ -1,8 +1,8 @@
 import _ from 'lodash';
 import * as THREE from 'three';
 
-import FRAGMENT_SHADER from '../shaders/fragment.glsl';
-import VERTEX_SHADER from '../shaders/vertex.glsl';
+import FRAGMENT_SHADER from './shaders/fragment.glsl';
+import VERTEX_SHADER from './shaders/vertex.glsl';
 
 export interface GpsPosition {
   lat: number;
