@@ -1,15 +1,36 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-import { Box, Button, ChakraProvider, DarkMode, extendTheme, Text } from '@chakra-ui/react';
+import _ from 'lodash';
+
+import { Box, Button, ChakraProvider, DarkMode, extendTheme, Select, Text } from '@chakra-ui/react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import { DEFAULT_PANEL_WIDTH } from './constants';
 import { setupThreeScene } from './scene';
 import { usePlaybackStore } from './stores/playbackStore';
+import { useSceneStore } from './stores/sceneStore';
 
 const config = {
   initialColorMode: 'dark',
   useSystemColorMode: false,
+  fonts: {
+    body: '-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+  },
+  fontSizes: {
+    xs: '8px',
+    sm: '10px',
+    md: '12px',
+    lg: '14px',
+    xl: '16px',
+    '2xl': '20px',
+    '3xl': '24px',
+    '4xl': '36px',
+    '5xl': '48px',
+    '6xl': '64px',
+  },
 };
+
+const pandaScenes = _.range(1, 48).map((i) => _.padStart(i.toString(), 3, '0'));
 
 const theme = extendTheme({ config });
 
@@ -19,6 +40,7 @@ function App(): JSX.Element {
   const guiPanel = useRef<HTMLDivElement>(null);
 
   const { timestamp, playing, setPlaying } = usePlaybackStore();
+  const { setSceneName } = useSceneStore();
 
   useEffect(() => {
     if (canvasContainer.current && guiPanel.current) {
@@ -42,7 +64,15 @@ function App(): JSX.Element {
             bg="gray.900"
             borderRight="1px solid #333"
             flexDirection="column"
-          ></Box>
+          >
+            <Select size="xs">
+              {pandaScenes.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </Select>
+          </Box>
           <Box
             flexGrow={1}
             bgColor="gray.900"
@@ -58,21 +88,43 @@ function App(): JSX.Element {
               color="white"
             >
               <Box
-                height={10}
+                p={1}
                 borderBottom="1px solid #333"
                 display="flex"
                 alignItems="center"
-                justifyContent="center"
+                justifyContent="space-between"
               >
-                {playing ? (
-                  <Button size="xs" onClick={() => setPlaying(false)}>
-                    Pause
+                <Box>
+                  <Select
+                    size="xs"
+                    placeholder="Select Scene"
+                    onChange={(e) => setSceneName(e.target.value)}
+                  >
+                    {pandaScenes.map((name) => (
+                      <option key={name} value={name}>
+                        Pandaset {name}
+                      </option>
+                    ))}
+                  </Select>
+                </Box>
+                <Box>
+                  <Button size="xs">
+                    <FontAwesomeIcon icon="backward-step" />
                   </Button>
-                ) : (
-                  <Button size="xs" onClick={() => setPlaying(true)}>
-                    Play
+                  {playing ? (
+                    <Button size="xs" onClick={() => setPlaying(false)}>
+                      <FontAwesomeIcon icon="pause" />
+                    </Button>
+                  ) : (
+                    <Button size="xs" onClick={() => setPlaying(true)}>
+                      <FontAwesomeIcon icon="play" />
+                    </Button>
+                  )}
+                  <Button size="xs">
+                    <FontAwesomeIcon icon="forward-step" />
                   </Button>
-                )}
+                </Box>
+                <Box />
               </Box>
               <Box>
                 <Text>Current timestamp: {(timestamp % 1000).toFixed(4)} seconds</Text>

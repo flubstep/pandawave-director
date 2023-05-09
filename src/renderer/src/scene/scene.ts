@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 import { DEFAULT_PANEL_WIDTH, VIDEO_ASPECT_RATIO } from '../constants';
 import { usePlaybackStore } from '../stores/playbackStore';
+import { useSceneStore } from '../stores/sceneStore';
 import { loadCameraPositions, loadJsonUrl, loadLidarFrames, PandaScene } from './loaders';
 
 function getTrackPositionAt(
@@ -40,7 +41,6 @@ export async function setupThreeScene(
   renderer.setPixelRatio(window.devicePixelRatio);
   container.appendChild(renderer.domElement);
 
-  let pandaScene: PandaScene | null = null;
   async function loadPandaScene(name: string): Promise<void> {
     if (pandaScene) {
       scene.remove(pandaScene.frames);
@@ -88,6 +88,16 @@ export async function setupThreeScene(
   };
 
   let animationPointer: number | null = null;
+  let pandaScene: PandaScene | null = null;
+
+  useSceneStore.subscribe((state) => {
+    const { sceneName } = state;
+    if (sceneName !== null && sceneName !== pandaScene?.name) {
+      loadPandaScene(sceneName);
+    } else if (state.sceneName === null && pandaScene !== null) {
+      unloadPandaScene();
+    }
+  });
 
   const params = {
     timeScale: 1 / 12.0,
@@ -107,10 +117,10 @@ export async function setupThreeScene(
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
     renderer.render(scene, camera);
+    const { playing, timestamp, setTimestamp } = usePlaybackStore.getState();
     if (!pandaScene) {
       return;
     }
-    const { playing, timestamp, setTimestamp } = usePlaybackStore.getState();
     if (!playing) {
       return;
     }
@@ -157,20 +167,6 @@ export async function setupThreeScene(
 
   const gui = new GUI({ autoPlace: false });
   gui.width = DEFAULT_PANEL_WIDTH;
-
-  const availableScenes: { [name: string]: () => Promise<void> } = {
-    '001': () => loadPandaScene('001'),
-    '002': () => loadPandaScene('002'),
-    '003': () => loadPandaScene('003'),
-    '004': () => loadPandaScene('004'),
-    '005': () => loadPandaScene('005'),
-    '006': () => loadPandaScene('006'),
-  };
-  const sceneGui = gui.addFolder('Load Scene');
-  for (const name of Object.keys(availableScenes)) {
-    sceneGui.add(availableScenes, name).name(`Pandaset Scene ${name}`);
-  }
-  sceneGui.open();
 
   const cameraGui = gui.addFolder('Camera Options');
   cameraGui.add(params, 'timeScale', 0.0, 1.0, 0.01).name('Time Scale');
