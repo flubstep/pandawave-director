@@ -106,8 +106,9 @@ export async function setupThreeScene(
   }
 
   const car = await loadCar();
+  car.rotation.x = -Math.PI / 2;
   scene.add(car);
-  camera.position.z = 20;
+  camera.position.set(8, 8, 2);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.object.up.set(0, 0, 1);
