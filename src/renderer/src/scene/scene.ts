@@ -195,7 +195,9 @@ export async function setupThreeScene(
       renderPandaScene(0.016);
       takeScreenshot(`panda_${pandaScene.name}_${frameIndex.toString().padStart(6, '0')}.png`);
       frameIndex += 1;
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (frameIndex % 10 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
     }
   }
 

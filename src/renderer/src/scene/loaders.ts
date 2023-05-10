@@ -17,17 +17,8 @@ export interface WorldPosition extends GpsPosition {
 }
 
 export interface CameraPose {
-  position: {
-    x: number;
-    y: number;
-    z: number;
-  };
-  heading: {
-    x: number;
-    y: number;
-    z: number;
-    w: number;
-  };
+  position: THREE.Vector3;
+  heading: THREE.Quaternion;
 }
 
 export interface PandaScene {

@@ -1,10 +1,11 @@
 {
-  "name": "electron-three-app",
+  "name": "pandawave-director",
   "version": "1.0.0",
-  "description": "An Electron application with React and TypeScript",
+  "description": "Three.js-based renderer for PandaSet LiDAR data",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://www.electronjs.org",
+  "author": "flubstep.com",
+  "homepage": "https://flubstep.com",
+  "license": "MIT",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
