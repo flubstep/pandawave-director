@@ -33,7 +33,7 @@ export interface CameraPose {
 export interface PandaScene {
   name: string;
   frames: THREE.Group;
-  positions: THREE.Vector3[];
+  poses: CameraPose[];
   timestamps: number[];
 }
 
@@ -58,9 +58,12 @@ export async function loadGpsPositions(url: string): Promise<WorldPosition[]> {
   return worldPositions;
 }
 
-export async function loadCameraPositions(url: string): Promise<THREE.Vector3[]> {
+export async function loadCameraPositions(url: string): Promise<CameraPose[]> {
   const poses = await loadJsonUrl<CameraPose[]>(url);
-  return poses.map((pose) => new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z));
+  return poses.map((pose) => ({
+    position: new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z),
+    heading: new THREE.Quaternion(pose.heading.x, pose.heading.y, pose.heading.z, pose.heading.w),
+  }));
 }
 
 export async function loadLidarFrames({

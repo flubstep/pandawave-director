@@ -1,30 +1,56 @@
 import { GUI } from 'dat.gui';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
+import CarGlb from '../assets/AudiV3_v40.glb?url';
 import { DEFAULT_PANEL_WIDTH, VIDEO_ASPECT_RATIO } from '../constants';
 import { usePlaybackStore } from '../stores/playbackStore';
 import { useSceneStore } from '../stores/sceneStore';
-import { loadCameraPositions, loadJsonUrl, loadLidarFrames, PandaScene } from './loaders';
+import {
+  CameraPose,
+  loadCameraPositions,
+  loadJsonUrl,
+  loadLidarFrames,
+  PandaScene,
+} from './loaders';
 
-function getTrackPositionAt(
-  timestamps: number[],
-  positions: THREE.Vector3[],
-  dt: number,
-): THREE.Vector3 {
+function loadCar(): Promise<THREE.Group> {
+  const loader = new GLTFLoader();
+  return new Promise((resolve, reject) => {
+    loader.load(
+      CarGlb,
+      (loadedModel) => {
+        loadedModel.scene.traverseVisible((object) => {
+          if (object.material) {
+            object.material = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+          }
+        });
+        resolve(loadedModel.scenes[0]);
+      },
+      undefined,
+      (error) => reject(error),
+    );
+  });
+}
+
+function getTrackPoseAt(timestamps: number[], poses: CameraPose[], dt: number): CameraPose {
   for (let ii = 0; ii < timestamps.length - 1; ii++) {
     const t1 = timestamps[ii] - timestamps[0];
     const t2 = timestamps[ii + 1] - timestamps[0];
     if (t1 <= dt && dt < t2) {
-      const p1 = positions[ii];
-      const p2 = positions[ii + 1];
+      const p1 = poses[ii].position;
+      const p2 = poses[ii + 1].position;
       const fraction = (dt - t1) / (t2 - t1);
       const position = new THREE.Vector3();
       position.lerpVectors(p1, p2, fraction);
-      return position;
+      return {
+        position,
+        heading: poses[ii].heading,
+      };
     }
   }
-  return positions[positions.length - 1];
+  return poses[poses.length - 1];
 }
 
 const OUTPUT_WIDTH = 1920;
@@ -54,11 +80,11 @@ export async function setupThreeScene(
     }
     const frameBaseUrl = `http://localhost:8080/pandaset_0/${name}`;
     const timestamps = await loadJsonUrl<number[]>(frameBaseUrl + `/meta/timestamps.json`); // timestamps are in seconds
-    const positions = await loadCameraPositions(frameBaseUrl + '/camera/front_camera/poses.json');
+    const poses = await loadCameraPositions(frameBaseUrl + '/camera/front_camera/poses.json');
     const frames = await loadLidarFrames({
       scene: name,
       timestamps,
-      positions,
+      positions: poses.map((p) => p.position),
     });
     scene.add(frames);
     const { setPlaying, setTimestamp } = usePlaybackStore.getState();
@@ -67,7 +93,7 @@ export async function setupThreeScene(
     pandaScene = {
       name,
       timestamps,
-      positions,
+      poses,
       frames,
     };
   }
@@ -79,11 +105,8 @@ export async function setupThreeScene(
     pandaScene = null;
   }
 
-  const geometry = new THREE.BoxGeometry();
-  const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
-  const cube = new THREE.Mesh(geometry, material);
-  scene.add(cube);
-
+  const car = await loadCar();
+  scene.add(car);
   camera.position.z = 20;
 
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -122,7 +145,7 @@ export async function setupThreeScene(
       return;
     }
     const { timestamp, setTimestamp } = usePlaybackStore.getState();
-    const { frames, positions, timestamps } = pandaScene;
+    const { frames, poses, timestamps } = pandaScene;
     const duration = timestamps[timestamps.length - 1] - timestamps[0];
     setTimestamp((timestamp + dt * params.timeScale) % duration);
 
@@ -132,13 +155,14 @@ export async function setupThreeScene(
     for (const frame of frames.children) {
       frame.material.uniforms.timeDelta.value = timeDelta;
     }
-    const carPosition = getTrackPositionAt(timestamps, positions, timeDelta);
-    cube.position.set(carPosition.x, carPosition.y, carPosition.z);
+    const pose = getTrackPoseAt(timestamps, poses, timeDelta);
+    car.position.set(pose.position.x, pose.position.y, pose.position.z);
+    car.rotation.setFromQuaternion(pose.heading);
     if (params.followCar) {
-      camera.position.x = cube.position.x;
-      camera.position.y = cube.position.y;
-      camera.lookAt(cube.position);
-      controls.position0 = cube.position;
+      camera.position.x = car.position.x;
+      camera.position.y = car.position.y;
+      camera.lookAt(car.position);
+      controls.position0 = car.position;
     }
   }
 
@@ -146,8 +170,6 @@ export async function setupThreeScene(
   function animate(): void {
     const dt = clock.getDelta();
     animationPointer = requestAnimationFrame(animate);
-    cube.rotation.x += 0.01;
-    cube.rotation.y += 0.01;
     renderer.render(scene, camera);
     const { playing } = usePlaybackStore.getState();
     if (!playing) {
