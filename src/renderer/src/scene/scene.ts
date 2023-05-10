@@ -36,7 +36,7 @@ export async function setupThreeScene(
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
   camera.up.set(0, 0, 1);
-  const renderer = new THREE.WebGLRenderer();
+  const renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
   renderer.setSize(width, height);
   renderer.setPixelRatio(window.devicePixelRatio);
   container.appendChild(renderer.domElement);
@@ -165,6 +165,12 @@ export async function setupThreeScene(
     camera.aspect = width / height;
   });
 
+  function takeScreenshot() {
+    const canvas = renderer.domElement;
+    const dataUrl = canvas.toDataURL('image/png');
+    window.api.saveImage(dataUrl);
+  }
+
   const gui = new GUI({ autoPlace: false });
   gui.width = DEFAULT_PANEL_WIDTH;
 
@@ -184,7 +190,7 @@ export async function setupThreeScene(
     .name('Decay Time (s)')
     .onChange(updateUniforms);
   shaderGui.open();
-  gui.add({ stop: () => unloadPandaScene() }, 'stop').name('Unload Current Scene');
+  gui.add({ takeScreenshot }, 'takeScreenshot').name('Take Screenshot');
   guiContainer.appendChild(gui.domElement);
 
   animate();

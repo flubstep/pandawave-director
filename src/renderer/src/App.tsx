@@ -2,7 +2,17 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import _ from 'lodash';
 
-import { Box, Button, ChakraProvider, DarkMode, extendTheme, Select, Text } from '@chakra-ui/react';
+import {
+  Box,
+  Button,
+  ChakraProvider,
+  DarkMode,
+  extendTheme,
+  Heading,
+  HStack,
+  Select,
+  Text,
+} from '@chakra-ui/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import { DEFAULT_PANEL_WIDTH } from './constants';
@@ -40,7 +50,7 @@ function App(): JSX.Element {
   const guiPanel = useRef<HTMLDivElement>(null);
 
   const { timestamp, playing, setPlaying } = usePlaybackStore();
-  const { setSceneName } = useSceneStore();
+  const { sceneName, setSceneName } = useSceneStore();
 
   useEffect(() => {
     if (canvasContainer.current && guiPanel.current) {
@@ -64,15 +74,7 @@ function App(): JSX.Element {
             bg="gray.900"
             borderRight="1px solid #333"
             flexDirection="column"
-          >
-            <Select size="xs">
-              {pandaScenes.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-          </Box>
+          ></Box>
           <Box
             flexGrow={1}
             bgColor="gray.900"
@@ -107,7 +109,7 @@ function App(): JSX.Element {
                     ))}
                   </Select>
                 </Box>
-                <Box>
+                <HStack spacing={0.5}>
                   <Button size="xs">
                     <FontAwesomeIcon icon="backward-step" />
                   </Button>
@@ -116,14 +118,21 @@ function App(): JSX.Element {
                       <FontAwesomeIcon icon="pause" />
                     </Button>
                   ) : (
-                    <Button size="xs" onClick={() => setPlaying(true)}>
+                    <Button
+                      size="xs"
+                      onClick={() => {
+                        if (sceneName) {
+                          setPlaying(true);
+                        }
+                      }}
+                    >
                       <FontAwesomeIcon icon="play" />
                     </Button>
                   )}
                   <Button size="xs">
                     <FontAwesomeIcon icon="forward-step" />
                   </Button>
-                </Box>
+                </HStack>
                 <Box />
               </Box>
               <Box>
