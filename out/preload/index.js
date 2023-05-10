@@ -2,8 +2,8 @@
 const electron = require("electron");
 const preload = require("@electron-toolkit/preload");
 const api = {
-  saveImage: (image) => {
-    electron.ipcRenderer.send("save-image", image);
+  saveImage: (image, filename) => {
+    electron.ipcRenderer.send("save-image", image, filename);
   }
 };
 if (process.contextIsolated) {

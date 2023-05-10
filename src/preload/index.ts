@@ -4,8 +4,8 @@ import { electronAPI } from '@electron-toolkit/preload';
 
 // Custom APIs for renderer
 const api = {
-  saveImage: (image) => {
-    ipcRenderer.send('save-image', image);
+  saveImage: (image: string, filename: string) => {
+    ipcRenderer.send('save-image', image, filename);
   },
 };
 

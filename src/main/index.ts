@@ -54,15 +54,15 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  ipcMain.on('save-image', async (_, dataUrl) => {
+  ipcMain.on('save-image', async (_, dataUrl, filename) => {
     const binary = atob(dataUrl.split(',')[1]);
     const buffer = new ArrayBuffer(binary.length);
     const uint8 = new Uint8Array(buffer);
     for (let i = 0; i < binary.length; i++) {
       uint8[i] = binary.charCodeAt(i);
     }
-    const appDataPath = '/Users/albert/';
-    const filePath = join(appDataPath, 'canvas.png');
+    const appDataPath = '/Users/albert/framesout/';
+    const filePath = join(appDataPath, filename);
     fs.writeFile(filePath, uint8, (err) => {
       if (err) {
         console.error(`Failed to save file: ${err}`);

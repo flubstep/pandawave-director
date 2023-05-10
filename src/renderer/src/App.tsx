@@ -49,7 +49,7 @@ function App(): JSX.Element {
   const canvasContainer = useRef<HTMLDivElement>(null);
   const guiPanel = useRef<HTMLDivElement>(null);
 
-  const { timestamp, playing, setPlaying } = usePlaybackStore();
+  const { timestamp, setTimestamp, playing, setPlaying } = usePlaybackStore();
   const { sceneName, setSceneName } = useSceneStore();
 
   useEffect(() => {
@@ -110,7 +110,7 @@ function App(): JSX.Element {
                   </Select>
                 </Box>
                 <HStack spacing={0.5}>
-                  <Button size="xs">
+                  <Button size="xs" onClick={() => setTimestamp(0.0)}>
                     <FontAwesomeIcon icon="backward-step" />
                   </Button>
                   {playing ? (

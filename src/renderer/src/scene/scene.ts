@@ -27,6 +27,9 @@ function getTrackPositionAt(
   return positions[positions.length - 1];
 }
 
+const OUTPUT_WIDTH = 1920;
+const OUTPUT_HEIGHT = 1080;
+
 export async function setupThreeScene(
   container: HTMLDivElement,
   guiContainer: HTMLDivElement,
@@ -34,12 +37,16 @@ export async function setupThreeScene(
   const width = window.innerWidth - DEFAULT_PANEL_WIDTH;
   const height = width / VIDEO_ASPECT_RATIO;
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+  const camera = new THREE.PerspectiveCamera(75, VIDEO_ASPECT_RATIO, 0.1, 1000);
   camera.up.set(0, 0, 1);
-  const renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
+  const renderer = new THREE.WebGLRenderer();
   renderer.setSize(width, height);
   renderer.setPixelRatio(window.devicePixelRatio);
   container.appendChild(renderer.domElement);
+
+  const recordingRenderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
+  recordingRenderer.setSize(OUTPUT_WIDTH, OUTPUT_HEIGHT);
+  recordingRenderer.setPixelRatio(1);
 
   async function loadPandaScene(name: string): Promise<void> {
     if (pandaScene) {
@@ -110,20 +117,11 @@ export async function setupThreeScene(
     decayTime: 0.15,
   };
 
-  const clock = new THREE.Clock();
-  function animate(): void {
-    const dt = clock.getDelta();
-    animationPointer = requestAnimationFrame(animate);
-    cube.rotation.x += 0.01;
-    cube.rotation.y += 0.01;
-    renderer.render(scene, camera);
-    const { playing, timestamp, setTimestamp } = usePlaybackStore.getState();
+  function renderPandaScene(dt: number) {
     if (!pandaScene) {
       return;
     }
-    if (!playing) {
-      return;
-    }
+    const { timestamp, setTimestamp } = usePlaybackStore.getState();
     const { frames, positions, timestamps } = pandaScene;
     const duration = timestamps[timestamps.length - 1] - timestamps[0];
     setTimestamp((timestamp + dt * params.timeScale) % duration);
@@ -141,6 +139,40 @@ export async function setupThreeScene(
       camera.position.y = cube.position.y;
       camera.lookAt(cube.position);
       controls.position0 = cube.position;
+    }
+  }
+
+  const clock = new THREE.Clock();
+  function animate(): void {
+    const dt = clock.getDelta();
+    animationPointer = requestAnimationFrame(animate);
+    cube.rotation.x += 0.01;
+    cube.rotation.y += 0.01;
+    renderer.render(scene, camera);
+    const { playing } = usePlaybackStore.getState();
+    if (!playing) {
+      return;
+    }
+    renderPandaScene(dt);
+  }
+
+  async function record(): Promise<void> {
+    const { setPlaying, setRecording, setTimestamp } = usePlaybackStore.getState();
+    if (!pandaScene) {
+      return;
+    }
+    setPlaying(false);
+    setRecording(true);
+    setTimestamp(0.0);
+    let lastTimestamp = 0.0;
+    let frameIndex = 0;
+    // Loop until we cycle back to the start again.
+    while (usePlaybackStore.getState().timestamp >= lastTimestamp) {
+      lastTimestamp = usePlaybackStore.getState().timestamp;
+      renderPandaScene(0.016);
+      takeScreenshot(`panda_${pandaScene.name}_${frameIndex.toString().padStart(6, '0')}.png`);
+      frameIndex += 1;
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }
 
@@ -165,10 +197,14 @@ export async function setupThreeScene(
     camera.aspect = width / height;
   });
 
-  function takeScreenshot() {
-    const canvas = renderer.domElement;
+  function takeScreenshot(filename?: string) {
+    if (!filename) {
+      filename = `Canvas Screenshot at ${new Date().toISOString()}.png`;
+    }
+    recordingRenderer.render(scene, camera);
+    const canvas = recordingRenderer.domElement;
     const dataUrl = canvas.toDataURL('image/png');
-    window.api.saveImage(dataUrl);
+    window.api.saveImage(dataUrl, filename);
   }
 
   const gui = new GUI({ autoPlace: false });
@@ -191,6 +227,7 @@ export async function setupThreeScene(
     .onChange(updateUniforms);
   shaderGui.open();
   gui.add({ takeScreenshot }, 'takeScreenshot').name('Take Screenshot');
+  gui.add({ record }, 'record').name('Record Scene');
   guiContainer.appendChild(gui.domElement);
 
   animate();
