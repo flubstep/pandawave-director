@@ -7,6 +7,15 @@ const api = {
   saveImage: (image: string, filename: string) => {
     ipcRenderer.send('save-image', image, filename);
   },
+  videoStart: (filename: string) => {
+    ipcRenderer.send('video-start', filename);
+  },
+  videoAddFrame: (dataUrl: string) => {
+    ipcRenderer.send('video-add-frame', dataUrl);
+  },
+  videoStop: () => {
+    ipcRenderer.send('video-stop');
+  },
 };
 
 // Use `contextBridge` APIs to expose Electron APIs to

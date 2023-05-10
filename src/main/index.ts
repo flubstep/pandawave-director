@@ -1,3 +1,4 @@
+import { spawn } from 'child_process';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import fs from 'fs';
 import { join } from 'path';
@@ -70,6 +71,77 @@ app.whenReady().then(() => {
         console.log(`File saved to: ${filePath}`);
       }
     });
+  });
+
+  const videoRecordingState: {
+    subprocess: ReturnType<typeof spawn> | null;
+  } = {
+    subprocess: null,
+  };
+
+  ipcMain.on('video-start', async (_, filename) => {
+    if (videoRecordingState.subprocess) {
+      console.warn('Killing existing ffmpeg proceess!');
+      videoRecordingState.subprocess.kill();
+    }
+    const appDataPath = '/Users/albert/Movies/';
+    const fullFilename = join(appDataPath, filename);
+    console.log(`Starting ffmpeg process for video recording, writing to ${fullFilename}`);
+    videoRecordingState.subprocess = spawn('ffmpeg', [
+      '-f',
+      'image2pipe',
+      '-loglevel',
+      'error',
+      '-r',
+      '60',
+      '-vcodec',
+      'png',
+      '-i',
+      '-',
+      '-y',
+      '-pix_fmt',
+      'yuv420p',
+      '-vcodec',
+      'libx264',
+      fullFilename,
+    ]);
+    if (videoRecordingState.subprocess.stdout) {
+      videoRecordingState.subprocess.stdout.pipe(process.stdout);
+    }
+    if (videoRecordingState.subprocess.stderr) {
+      videoRecordingState.subprocess.stderr.pipe(process.stdout);
+    }
+  });
+
+  ipcMain.on('video-add-frame', async (_, dataUrl) => {
+    const { subprocess } = videoRecordingState;
+    if (!subprocess) {
+      console.error('No ffmpeg process running!');
+      return;
+    }
+    const binary = atob(dataUrl.split(',')[1]);
+    const buffer = new ArrayBuffer(binary.length);
+    const uint8 = new Uint8Array(buffer);
+    for (let i = 0; i < binary.length; i++) {
+      uint8[i] = binary.charCodeAt(i);
+    }
+    if (subprocess.stdin) {
+      subprocess.stdin.write(uint8);
+    }
+  });
+
+  ipcMain.on('video-stop', async () => {
+    const { subprocess } = videoRecordingState;
+    if (!subprocess) {
+      console.error('No ffmpeg process running!');
+      return;
+    }
+    console.log('Stopping ffmpeg process');
+    if (subprocess.stdin) {
+      subprocess.stdin.end();
+    }
+    subprocess.kill();
+    videoRecordingState.subprocess = null;
   });
 
   createWindow();

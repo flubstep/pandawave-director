@@ -190,15 +190,18 @@ export async function setupThreeScene(
     let lastTimestamp = 0.0;
     let frameIndex = 0;
     // Loop until we cycle back to the start again.
+    window.api.videoStart(`pandaset_${pandaScene.name}.mp4`);
     while (usePlaybackStore.getState().timestamp >= lastTimestamp) {
       lastTimestamp = usePlaybackStore.getState().timestamp;
       renderPandaScene(0.016);
-      takeScreenshot(`panda_${pandaScene.name}_${frameIndex.toString().padStart(6, '0')}.png`);
+      const dataUrl = getCanvasDataUrl();
+      window.api.videoAddFrame(dataUrl);
       frameIndex += 1;
       if (frameIndex % 10 === 0) {
         await new Promise((resolve) => setTimeout(resolve, 0));
       }
     }
+    window.api.videoStop();
   }
 
   function updateUniforms(): void {
@@ -222,13 +225,17 @@ export async function setupThreeScene(
     camera.aspect = width / height;
   });
 
+  function getCanvasDataUrl() {
+    recordingRenderer.render(scene, camera);
+    const canvas = recordingRenderer.domElement;
+    return canvas.toDataURL('image/png');
+  }
+
   function takeScreenshot(filename?: string) {
     if (!filename) {
       filename = `Canvas Screenshot at ${new Date().toISOString()}.png`;
     }
-    recordingRenderer.render(scene, camera);
-    const canvas = recordingRenderer.domElement;
-    const dataUrl = canvas.toDataURL('image/png');
+    const dataUrl = getCanvasDataUrl();
     window.api.saveImage(dataUrl, filename);
   }
 

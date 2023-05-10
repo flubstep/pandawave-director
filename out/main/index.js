@@ -1,4 +1,5 @@
 "use strict";
+const child_process = require("child_process");
 const electron = require("electron");
 const fs = require("fs");
 const path = require("path");
@@ -52,6 +53,65 @@ electron.app.whenReady().then(() => {
         console.log(`File saved to: ${filePath}`);
       }
     });
+  });
+  const videoRecordingState = {
+    subprocess: null
+  };
+  electron.ipcMain.on("video-start", async (_, filename) => {
+    if (videoRecordingState.subprocess) {
+      console.error("Killing existing ffmpeg proceess");
+      videoRecordingState.subprocess.kill();
+    }
+    const appDataPath = "/Users/albert/Movies/";
+    const fullFilename = path.join(appDataPath, filename);
+    console.log(`Starting ffmpeg process for video recording, writing to ${fullFilename}`);
+    videoRecordingState.subprocess = child_process.spawn("ffmpeg", [
+      "-f",
+      "image2pipe",
+      "-r",
+      "60",
+      "-vcodec",
+      "png",
+      "-i",
+      "-",
+      "-y",
+      "-pix_fmt",
+      "yuv420p",
+      "-vcodec",
+      "libx264",
+      fullFilename
+    ]);
+    videoRecordingState.subprocess.stdout.pipe(process.stdout);
+    videoRecordingState.subprocess.stderr.pipe(process.stdout);
+  });
+  electron.ipcMain.on("video-add-frame", async (_, dataUrl) => {
+    const { subprocess } = videoRecordingState;
+    if (!subprocess) {
+      console.error("No ffmpeg process running!");
+      return;
+    }
+    const binary = atob(dataUrl.split(",")[1]);
+    const buffer = new ArrayBuffer(binary.length);
+    const uint8 = new Uint8Array(buffer);
+    for (let i = 0; i < binary.length; i++) {
+      uint8[i] = binary.charCodeAt(i);
+    }
+    if (subprocess.stdin) {
+      subprocess.stdin.write(uint8);
+    }
+  });
+  electron.ipcMain.on("video-stop", async () => {
+    const { subprocess } = videoRecordingState;
+    if (!subprocess) {
+      console.error("No ffmpeg process running!");
+      return;
+    }
+    console.log("Stopping ffmpeg process");
+    if (subprocess.stdin) {
+      subprocess.stdin.end();
+    }
+    subprocess.kill();
+    videoRecordingState.subprocess = null;
   });
   createWindow();
   electron.app.on("activate", function() {
