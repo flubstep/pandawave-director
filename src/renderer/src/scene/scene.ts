@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
-import CarGlb from '../assets/AudiV3_v40.glb?url';
+import CarGlb from '../assets/chrysler_pacifica.glb?url';
 import { DEFAULT_PANEL_WIDTH, VIDEO_ASPECT_RATIO } from '../constants';
 import { usePlaybackStore } from '../stores/playbackStore';
 import { useSceneStore } from '../stores/sceneStore';
