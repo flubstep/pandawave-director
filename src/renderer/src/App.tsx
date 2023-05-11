@@ -10,6 +10,11 @@ import {
   extendTheme,
   Heading,
   HStack,
+  Menu,
+  MenuButton,
+  MenuCommand,
+  MenuItem,
+  MenuList,
   Select,
   Slider,
   SliderFilledTrack,
@@ -22,6 +27,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import { DEFAULT_PANEL_WIDTH } from './constants';
 import { setupThreeScene } from './scene';
+import { useActionStore } from './stores/actionsStore';
 import { usePlaybackStore } from './stores/playbackStore';
 import { useSceneStore } from './stores/sceneStore';
 
@@ -56,13 +62,14 @@ function App(): JSX.Element {
 
   const { timestamp, setTimestamp, duration, playing, setPlaying } = usePlaybackStore();
   const { sceneName, setSceneName } = useSceneStore();
+  const { record, screenshot } = useActionStore();
 
   useEffect(() => {
     if (canvasContainer.current && guiPanel.current) {
       const teardownPromise = setupThreeScene(canvasContainer.current, guiPanel.current);
       return async () => {
-        const teardownFn = await teardownPromise;
-        teardownFn();
+        const teardown = await teardownPromise;
+        teardown();
       };
     }
     return () => {};
@@ -139,7 +146,35 @@ function App(): JSX.Element {
                     <FontAwesomeIcon icon="forward-step" />
                   </Button>
                 </HStack>
-                <Box />
+                <Box fontSize={12}>
+                  <Menu size="xs">
+                    <MenuButton m={1}>
+                      Render <FontAwesomeIcon size="xs" icon="chevron-down" />
+                    </MenuButton>
+                    <MenuList>
+                      <MenuItem
+                        onClick={() => {
+                          if (screenshot) {
+                            screenshot();
+                          }
+                        }}
+                        disabled={!screenshot}
+                      >
+                        Take Screenshot
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          if (record) {
+                            record();
+                          }
+                        }}
+                        disabled={!record}
+                      >
+                        Record Video
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
+                </Box>
               </Box>
               {duration > 0 && (
                 <Box>

@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
+import { useActionStore } from '@renderer/stores/actionsStore';
+
 import CarGlb from '../assets/chrysler_pacifica.glb?url';
 import { DEFAULT_PANEL_WIDTH, VIDEO_ASPECT_RATIO } from '../constants';
 import { usePlaybackStore } from '../stores/playbackStore';
@@ -56,10 +58,16 @@ function getTrackPoseAt(timestamps: number[], poses: CameraPose[], dt: number): 
 const OUTPUT_WIDTH = 1920;
 const OUTPUT_HEIGHT = 1080;
 
+type TeardownFunction = () => void;
+
+function currentTimeString() {
+  return new Date().toLocaleString().replaceAll('/', '-').replaceAll(':', '.').replaceAll(',', '');
+}
+
 export async function setupThreeScene(
   container: HTMLDivElement,
   guiContainer: HTMLDivElement,
-): Promise<() => void> {
+): Promise<TeardownFunction> {
   const width = window.innerWidth - DEFAULT_PANEL_WIDTH;
   const height = width / VIDEO_ASPECT_RATIO;
   const scene = new THREE.Scene();
@@ -178,10 +186,13 @@ export async function setupThreeScene(
     renderPandaScene(playing ? dt : 0.0);
   }
 
-  async function record(): Promise<void> {
+  async function record(filename?: string): Promise<void> {
     const { setPlaying, setRecording, setTimestamp } = usePlaybackStore.getState();
     if (!pandaScene) {
       return;
+    }
+    if (!filename) {
+      filename = `Video Capture of PandaSet_${pandaScene.name} at ${currentTimeString()}.mp4`;
     }
     setPlaying(false);
     setRecording(true);
@@ -189,7 +200,7 @@ export async function setupThreeScene(
     let lastTimestamp = 0.0;
     let frameIndex = 0;
     // Loop until we cycle back to the start again.
-    window.api.videoStart(`pandaset_${pandaScene.name}.mp4`);
+    window.api.videoStart(filename);
     while (usePlaybackStore.getState().timestamp >= lastTimestamp) {
       lastTimestamp = usePlaybackStore.getState().timestamp;
       renderPandaScene(0.016);
@@ -231,9 +242,9 @@ export async function setupThreeScene(
     return canvas.toDataURL('image/png');
   }
 
-  function takeScreenshot(filename?: string) {
+  async function screenshot(filename?: string) {
     if (!filename) {
-      filename = `Canvas Screenshot at ${new Date().toISOString()}.png`;
+      filename = `Canvas Screenshot at ${currentTimeString()}.png`;
     }
     const dataUrl = getCanvasDataUrl();
     window.api.saveImage(dataUrl, filename);
@@ -258,17 +269,22 @@ export async function setupThreeScene(
     .name('Decay Time (s)')
     .onChange(updateUniforms);
   shaderGui.open();
-  gui.add({ takeScreenshot }, 'takeScreenshot').name('Take Screenshot');
+  gui.add({ screenshot }, 'screenshot').name('Take Screenshot');
   gui.add({ record }, 'record').name('Record Scene');
   guiContainer.appendChild(gui.domElement);
 
   animate();
-  return () => {
+
+  useActionStore.getState().setScreenshotFunction(screenshot);
+  useActionStore.getState().setRecordFunction(record);
+
+  function teardown() {
     if (animationPointer) {
       cancelAnimationFrame(animationPointer);
     }
     guiContainer.removeChild(gui.domElement);
     container.removeChild(renderer.domElement);
     renderer.dispose();
-  };
+  }
+  return teardown;
 }

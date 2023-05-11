@@ -44,7 +44,7 @@ electron.app.whenReady().then(() => {
     for (let i = 0; i < binary.length; i++) {
       uint8[i] = binary.charCodeAt(i);
     }
-    const appDataPath = "/Users/albert/framesout/";
+    const appDataPath = "/Users/albert/Documents/";
     const filePath = path.join(appDataPath, filename);
     fs.writeFile(filePath, uint8, (err) => {
       if (err) {
