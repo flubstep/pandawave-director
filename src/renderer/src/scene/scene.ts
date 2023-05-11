@@ -144,6 +144,8 @@ export async function setupThreeScene(
   const params = {
     timeScale: 1 / 12.0,
     followCar: false,
+    autoRotate: false,
+    autoRotateSpeed: 0.5,
   };
   const shaderParams = {
     zMin: -2.0,
@@ -170,10 +172,7 @@ export async function setupThreeScene(
     car.position.set(pose.position.x, pose.position.y, pose.position.z);
     car.rotation.setFromQuaternion(pose.heading);
     if (params.followCar) {
-      camera.position.x = car.position.x;
-      camera.position.y = car.position.y;
-      camera.lookAt(car.position);
-      controls.position0 = car.position;
+      controls.target = car.position.clone();
     }
   }
 
@@ -181,6 +180,7 @@ export async function setupThreeScene(
   function animate(): void {
     const dt = clock.getDelta();
     animationPointer = requestAnimationFrame(animate);
+    controls.update();
     renderer.render(scene, camera);
     const { playing } = usePlaybackStore.getState();
     renderPandaScene(playing ? dt : 0.0);
@@ -256,6 +256,19 @@ export async function setupThreeScene(
   const cameraGui = gui.addFolder('Camera Options');
   cameraGui.add(params, 'timeScale', 0.0, 1.0, 0.01).name('Time Scale');
   cameraGui.add(params, 'followCar').name('Auto Follow Car');
+  cameraGui
+    .add(params, 'autoRotate')
+    .name('Auto-Rotate')
+    .onChange((value: boolean) => {
+      controls.autoRotate = value;
+    });
+  cameraGui
+    .add(params, 'autoRotateSpeed', 0.0, 2.0, 0.01)
+    .name('Auto-Rotate Speed')
+    .onChange((value: number) => {
+      controls.autoRotateSpeed = value;
+    });
+
   cameraGui.open();
   const shaderGui = gui.addFolder('Shader Options');
   shaderGui.add(shaderParams, 'zMin', -10.0, 10.0, 0.1).name('Z-Floor').onChange(updateUniforms);
@@ -269,8 +282,6 @@ export async function setupThreeScene(
     .name('Decay Time (s)')
     .onChange(updateUniforms);
   shaderGui.open();
-  gui.add({ screenshot }, 'screenshot').name('Take Screenshot');
-  gui.add({ record }, 'record').name('Record Scene');
   guiContainer.appendChild(gui.domElement);
 
   animate();
