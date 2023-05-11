@@ -87,14 +87,17 @@ export async function setupThreeScene(
       positions: poses.map((p) => p.position),
     });
     scene.add(frames);
-    const { setPlaying, setTimestamp } = usePlaybackStore.getState();
+    const { setPlaying, setDuration, setTimestamp } = usePlaybackStore.getState();
+    const duration = timestamps[timestamps.length - 1] - timestamps[0];
     setPlaying(true);
     setTimestamp(0.0);
+    setDuration(duration);
     pandaScene = {
       name,
       timestamps,
       poses,
       frames,
+      duration,
     };
   }
   async function unloadPandaScene(): Promise<void> {
@@ -146,8 +149,7 @@ export async function setupThreeScene(
       return;
     }
     const { timestamp, setTimestamp } = usePlaybackStore.getState();
-    const { frames, poses, timestamps } = pandaScene;
-    const duration = timestamps[timestamps.length - 1] - timestamps[0];
+    const { frames, poses, timestamps, duration } = pandaScene;
     setTimestamp((timestamp + dt * params.timeScale) % duration);
 
     // TODO: Make cleaner
@@ -173,10 +175,7 @@ export async function setupThreeScene(
     animationPointer = requestAnimationFrame(animate);
     renderer.render(scene, camera);
     const { playing } = usePlaybackStore.getState();
-    if (!playing) {
-      return;
-    }
-    renderPandaScene(dt);
+    renderPandaScene(playing ? dt : 0.0);
   }
 
   async function record(): Promise<void> {
@@ -202,6 +201,7 @@ export async function setupThreeScene(
       }
     }
     window.api.videoStop();
+    setRecording(false);
   }
 
   function updateUniforms(): void {

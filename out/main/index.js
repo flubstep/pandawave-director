@@ -59,7 +59,7 @@ electron.app.whenReady().then(() => {
   };
   electron.ipcMain.on("video-start", async (_, filename) => {
     if (videoRecordingState.subprocess) {
-      console.error("Killing existing ffmpeg proceess");
+      console.warn("Killing existing ffmpeg proceess!");
       videoRecordingState.subprocess.kill();
     }
     const appDataPath = "/Users/albert/Movies/";
@@ -68,6 +68,8 @@ electron.app.whenReady().then(() => {
     videoRecordingState.subprocess = child_process.spawn("ffmpeg", [
       "-f",
       "image2pipe",
+      "-loglevel",
+      "error",
       "-r",
       "60",
       "-vcodec",
@@ -81,8 +83,12 @@ electron.app.whenReady().then(() => {
       "libx264",
       fullFilename
     ]);
-    videoRecordingState.subprocess.stdout.pipe(process.stdout);
-    videoRecordingState.subprocess.stderr.pipe(process.stdout);
+    if (videoRecordingState.subprocess.stdout) {
+      videoRecordingState.subprocess.stdout.pipe(process.stdout);
+    }
+    if (videoRecordingState.subprocess.stderr) {
+      videoRecordingState.subprocess.stderr.pipe(process.stdout);
+    }
   });
   electron.ipcMain.on("video-add-frame", async (_, dataUrl) => {
     const { subprocess } = videoRecordingState;

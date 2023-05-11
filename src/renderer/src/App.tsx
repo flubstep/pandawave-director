@@ -11,6 +11,11 @@ import {
   Heading,
   HStack,
   Select,
+  Slider,
+  SliderFilledTrack,
+  SliderMark,
+  SliderThumb,
+  SliderTrack,
   Text,
 } from '@chakra-ui/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -49,7 +54,7 @@ function App(): JSX.Element {
   const canvasContainer = useRef<HTMLDivElement>(null);
   const guiPanel = useRef<HTMLDivElement>(null);
 
-  const { timestamp, setTimestamp, playing, setPlaying } = usePlaybackStore();
+  const { timestamp, setTimestamp, duration, playing, setPlaying } = usePlaybackStore();
   const { sceneName, setSceneName } = useSceneStore();
 
   useEffect(() => {
@@ -91,6 +96,7 @@ function App(): JSX.Element {
             >
               <Box
                 p={1}
+                bgColor="gray.800"
                 borderBottom="1px solid #333"
                 display="flex"
                 alignItems="center"
@@ -135,9 +141,37 @@ function App(): JSX.Element {
                 </HStack>
                 <Box />
               </Box>
-              <Box>
-                <Text>Current timestamp: {(timestamp % 1000).toFixed(4)} seconds</Text>
-              </Box>
+              {duration > 0 && (
+                <Box>
+                  <Slider
+                    value={timestamp}
+                    onChange={setTimestamp}
+                    min={0}
+                    max={duration}
+                    step={0.01}
+                    height={5}
+                  >
+                    <SliderTrack height={5} bg="gray.700">
+                      <SliderFilledTrack bg="blue.500" />
+                    </SliderTrack>
+                    <SliderMark
+                      height={5}
+                      value={timestamp}
+                      textAlign="center"
+                      lineHeight={5}
+                      fontSize={12}
+                      fontWeight={700}
+                      fontFamily="monospace"
+                      color="white"
+                      ml={timestamp < 0.5 ? 2 : -14}
+                      mt={0}
+                      w="12"
+                    >
+                      {timestamp.toFixed(3)}s
+                    </SliderMark>
+                  </Slider>
+                </Box>
+              )}
             </Box>
           </Box>
         </Box>

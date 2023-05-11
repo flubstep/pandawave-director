@@ -26,6 +26,7 @@ export interface PandaScene {
   frames: THREE.Group;
   poses: CameraPose[];
   timestamps: number[];
+  duration: number;
 }
 
 export async function loadJsonUrl<T>(url: string): Promise<T> {
