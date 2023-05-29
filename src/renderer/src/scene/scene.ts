@@ -182,13 +182,6 @@ export async function setupThreeScene(
     const pose = getTrackPoseAt(timestamps, poses, timeDelta);
     car.position.set(pose.position.x, pose.position.y, pose.position.z);
     car.rotation.setFromQuaternion(pose.heading);
-    if (params.followVectorEnabled && params.followVector) {
-      camera.position.copy(car.position);
-      camera.position.add(params.followVector);
-    }
-    if (params.followCar) {
-      controls.target = car.position.clone();
-    }
   }
 
   const clock = new THREE.Clock();
@@ -199,6 +192,13 @@ export async function setupThreeScene(
     const { playing } = usePlaybackStore.getState();
     renderPandaScene(playing ? dt : 0.0);
     if (playing) {
+      if (params.followVectorEnabled && params.followVector) {
+        camera.position.copy(car.position);
+        camera.position.add(params.followVector);
+      }
+      if (params.followCar) {
+        controls.target = car.position.clone();
+      }
       controls.update();
     }
   }
