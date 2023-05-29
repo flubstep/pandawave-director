@@ -11,7 +11,7 @@ varying vec4 v_heightColor;
 
 void main() {
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = max(size, size / gl_Position.w);
+  gl_PointSize = max(size, size / gl_Position.w * 5.0);
 
   float p = (position.z - zMin) / (zMax - zMin);
   highp float height = p * 16581375.0;

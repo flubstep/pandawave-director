@@ -141,9 +141,18 @@ export async function setupThreeScene(
     }
   });
 
-  const params = {
-    timeScale: 1 / 12.0,
+  const params: {
+    framesPerMinute: number;
+    followCar: boolean;
+    followVectorEnabled: boolean;
+    followVector: THREE.Vector3 | null;
+    autoRotate: boolean;
+    autoRotateSpeed: number;
+  } = {
+    framesPerMinute: 95,
     followCar: false,
+    followVectorEnabled: false,
+    followVector: null,
     autoRotate: false,
     autoRotateSpeed: 0.5,
   };
@@ -160,7 +169,9 @@ export async function setupThreeScene(
     }
     const { timestamp, setTimestamp } = usePlaybackStore.getState();
     const { frames, poses, timestamps, duration } = pandaScene;
-    setTimestamp((timestamp + dt * params.timeScale) % duration);
+    const framesPerSecond = params.framesPerMinute / 60;
+    const timeScale = framesPerSecond * 0.1;
+    setTimestamp((timestamp + dt * timeScale) % duration);
 
     // TODO: Make cleaner
     const timeDelta = usePlaybackStore.getState().timestamp;
@@ -171,6 +182,10 @@ export async function setupThreeScene(
     const pose = getTrackPoseAt(timestamps, poses, timeDelta);
     car.position.set(pose.position.x, pose.position.y, pose.position.z);
     car.rotation.setFromQuaternion(pose.heading);
+    if (params.followVectorEnabled && params.followVector) {
+      camera.position.copy(car.position);
+      camera.position.add(params.followVector);
+    }
     if (params.followCar) {
       controls.target = car.position.clone();
     }
@@ -180,10 +195,12 @@ export async function setupThreeScene(
   function animate(): void {
     const dt = clock.getDelta();
     animationPointer = requestAnimationFrame(animate);
-    controls.update();
     renderer.render(scene, camera);
     const { playing } = usePlaybackStore.getState();
     renderPandaScene(playing ? dt : 0.0);
+    if (playing) {
+      controls.update();
+    }
   }
 
   async function record(filename?: string): Promise<void> {
@@ -202,6 +219,7 @@ export async function setupThreeScene(
     // Loop until we cycle back to the start again.
     window.api.videoStart(filename);
     while (usePlaybackStore.getState().timestamp >= lastTimestamp) {
+      controls.update();
       lastTimestamp = usePlaybackStore.getState().timestamp;
       renderPandaScene(0.016);
       const dataUrl = getCanvasDataUrl();
@@ -254,8 +272,15 @@ export async function setupThreeScene(
   gui.width = DEFAULT_PANEL_WIDTH;
 
   const cameraGui = gui.addFolder('Camera Options');
-  cameraGui.add(params, 'timeScale', 0.0, 1.0, 0.01).name('Time Scale');
-  cameraGui.add(params, 'followCar').name('Auto Follow Car');
+  cameraGui.add(params, 'framesPerMinute', 10, 200, 1.0).name('BPM');
+  cameraGui.add(params, 'followCar').name('Follow: Rotate Camera');
+  cameraGui
+    .add(params, 'followVectorEnabled')
+    .name('Follow: Maintain Camera Distance')
+    .onChange(() => {
+      params.followVector = camera.position.clone();
+      params.followVector.sub(car.position);
+    });
   cameraGui
     .add(params, 'autoRotate')
     .name('Auto-Rotate')
