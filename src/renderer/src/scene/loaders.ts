@@ -77,8 +77,10 @@ export async function loadLidarFrames({
     const timestampZero = timestamps[0];
     const deltaPosition = position;
     const url = frameBaseUrl + `/lidar_bin/${frameNumber}.bin`;
+    const annotationsUrl = frameBaseUrl + `/annotations_bin/semseg/${frameNumber}.bin`;
     const frame = await loadFrame({
       url,
+      annotationsUrl,
       timestamp: timestamp - timestampZero,
       origin: deltaPosition,
     });
@@ -89,18 +91,31 @@ export async function loadLidarFrames({
 
 export async function loadFrame({
   url,
+  annotationsUrl,
   timestamp,
   origin,
 }: {
   url: string;
+  annotationsUrl: string;
   timestamp: number;
   origin: THREE.Vector3;
 }): Promise<THREE.Object3D> {
   const response = await fetch(url);
   const buffer = await response.arrayBuffer();
+  const segmentsResponse = await fetch(annotationsUrl);
+  const segmentBuffer =
+    segmentsResponse.status === 200 ? await segmentsResponse.arrayBuffer() : null;
+
   const vertices = new Float32Array(buffer);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+  if (segmentBuffer) {
+    const segments = new Int32Array(segmentBuffer);
+    geometry.setAttribute('segment', new THREE.BufferAttribute(segments, 1));
+  } else {
+    const segments = new Int32Array(vertices.length / 3);
+    geometry.setAttribute('segment', new THREE.BufferAttribute(segments, 1));
+  }
   const material = new THREE.ShaderMaterial({
     vertexShader: VERTEX_SHADER,
     fragmentShader: FRAGMENT_SHADER,

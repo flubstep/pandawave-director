@@ -7,6 +7,8 @@ uniform vec3 lidarOrigin;
 uniform float lidarSpeed; // meters per secont
 uniform float decayTime;  // seconds
 
+attribute int segment;
+
 varying vec4 v_heightColor;
 
 void main() {
@@ -33,6 +35,9 @@ void main() {
   float alpha = 1.0 - (timeDelta - arrivalTime) / decayTime;
   if(timeDelta < arrivalTime) {
     alpha = 0.0;
+  }
+  if(segment != 13) {
+    color = vec3(0.2, 0.2, 0.2);
   }
   v_heightColor = vec4(color, alpha);
 }
