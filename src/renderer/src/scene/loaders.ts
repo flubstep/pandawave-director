@@ -89,6 +89,43 @@ export async function loadLidarFrames({
   return group;
 }
 
+const numClasses = 256;
+const colorMap = new Uint8Array(4 * numClasses);
+
+export function createColorMapTexture() {
+  const width = 256;
+  const height = 1;
+
+  const color = new THREE.Color(0x444444);
+
+  const r = Math.floor(color.r * 255);
+  const g = Math.floor(color.g * 255);
+  const b = Math.floor(color.b * 255);
+
+  for (let i = 0; i < numClasses; i++) {
+    const stride = i * 4;
+    colorMap[stride] = r;
+    colorMap[stride + 1] = g;
+    colorMap[stride + 2] = b;
+    colorMap[stride + 3] = 255;
+  }
+
+  // used the buffer to create a DataTexture
+  const texture = new THREE.DataTexture(colorMap, width, height);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+export const colorMapTexture = createColorMapTexture();
+
+export function updateColorMap(mapping: number[]) {
+  for (let i = 0; i < numClasses; i++) {
+    const stride = i * 4;
+    colorMap[stride + 3] = mapping[i];
+  }
+  colorMapTexture.needsUpdate = true;
+}
+
 export async function loadFrame({
   url,
   annotationsUrl,
@@ -128,6 +165,7 @@ export async function loadFrame({
       lidarOrigin: { value: origin },
       lidarSpeed: { value: 120.0 },
       decayTime: { value: 0.15 },
+      colorMap: { value: colorMapTexture },
     },
     transparent: true,
   });

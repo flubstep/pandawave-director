@@ -1,4 +1,5 @@
 import { GUI } from 'dat.gui';
+import _ from 'lodash';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
@@ -11,10 +12,12 @@ import { usePlaybackStore } from '../stores/playbackStore';
 import { useSceneStore } from '../stores/sceneStore';
 import {
   CameraPose,
+  createColorMapTexture,
   loadCameraPositions,
   loadJsonUrl,
   loadLidarFrames,
   PandaScene,
+  updateColorMap,
 } from './loaders';
 
 function loadCar(): Promise<THREE.Group> {
@@ -88,6 +91,12 @@ export async function setupThreeScene(
   const recordingRenderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
   recordingRenderer.setSize(OUTPUT_WIDTH, OUTPUT_HEIGHT);
   recordingRenderer.setPixelRatio(1);
+
+  // TODO: remove later
+  const mapping = _.range(256).map(() => 25);
+  mapping[30] = 255.0;
+  mapping[31] = 255.0;
+  updateColorMap(mapping);
 
   async function loadPandaScene(name: string): Promise<void> {
     if (pandaScene) {

@@ -7,6 +7,8 @@ uniform vec3 lidarOrigin;
 uniform float lidarSpeed; // meters per secont
 uniform float decayTime;  // seconds
 
+uniform sampler2D colorMap;
+
 attribute int segment;
 
 varying vec4 v_heightColor;
@@ -36,8 +38,10 @@ void main() {
   if(timeDelta < arrivalTime) {
     alpha = 0.0;
   }
-  if(segment != 13) {
-    color = vec3(0.2, 0.2, 0.2);
-  }
+
+  vec2 uv = vec2(float(segment) / 256.0, 0.5);
+  vec4 texel = texture2D(colorMap, uv);
+  color = mix(texel.rgb, color, texel.a);
+
   v_heightColor = vec4(color, alpha);
 }
