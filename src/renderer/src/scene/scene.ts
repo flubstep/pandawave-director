@@ -61,7 +61,14 @@ const OUTPUT_HEIGHT = 1080;
 type TeardownFunction = () => void;
 
 function currentTimeString() {
-  return new Date().toLocaleString().replaceAll('/', '-').replaceAll(':', '.').replaceAll(',', '');
+  const d = new Date();
+  const YY = d.getFullYear();
+  const MM = d.getMonth().toString().padStart(2, '0');
+  const DD = d.getDate().toString().padStart(2, '0');
+  const hh = d.getHours().toString().padStart(2, '0');
+  const mm = d.getMinutes().toString().padStart(2, '0');
+  const ss = d.getSeconds().toString().padStart(2, '0');
+  return `${YY}-${MM}-${DD} ${hh}.${mm}.${ss}`;
 }
 
 export async function setupThreeScene(
@@ -184,13 +191,7 @@ export async function setupThreeScene(
     car.rotation.setFromQuaternion(pose.heading);
   }
 
-  const clock = new THREE.Clock();
-  function animate(): void {
-    const dt = clock.getDelta();
-    animationPointer = requestAnimationFrame(animate);
-    renderer.render(scene, camera);
-    const { playing } = usePlaybackStore.getState();
-    renderPandaScene(playing ? dt : 0.0);
+  function updateCameraControls(playing: boolean) {
     if (playing) {
       if (params.followVectorEnabled && params.followVector) {
         camera.position.copy(car.position);
@@ -200,7 +201,20 @@ export async function setupThreeScene(
         controls.target = car.position.clone();
       }
       controls.update();
+    } else if (params.followVectorEnabled) {
+      params.followVector = camera.position.clone();
+      params.followVector.sub(car.position);
     }
+  }
+
+  const clock = new THREE.Clock();
+  function animate(): void {
+    const dt = clock.getDelta();
+    animationPointer = requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+    const { playing } = usePlaybackStore.getState();
+    renderPandaScene(playing ? dt : 0.0);
+    updateCameraControls(playing);
   }
 
   async function record(filename?: string): Promise<void> {
@@ -222,6 +236,7 @@ export async function setupThreeScene(
       controls.update();
       lastTimestamp = usePlaybackStore.getState().timestamp;
       renderPandaScene(0.016);
+      updateCameraControls(true);
       const dataUrl = getCanvasDataUrl();
       window.api.videoAddFrame(dataUrl);
       frameIndex += 1;
