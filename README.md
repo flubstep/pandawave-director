@@ -1,34 +1,10 @@
-# electron-three-app
+# Pandawave Director
 
-An Electron application with React and TypeScript
+An Electron app designed to be a vaporwave-style renderer of Pandaset LiDAR data to video.
 
-## Recommended IDE Setup
+<img width="1192" alt="image" src="https://github.com/flubstep/pandawave-director/assets/152084/14879750-4e1b-4861-ad53-ff115b2953a6">
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+## Setup
 
-## Project Setup
-
-### Install
-
-```bash
-$ npm install
-```
-
-### Development
-
-```bash
-$ npm run dev
-```
-
-### Build
-
-```bash
-# For windows
-$ npm run build:win
-
-# For macOS
-$ npm run build:mac
-
-# For Linux
-$ npm run build:linux
-```
+This currently requires a copy of the Pandaset data: https://github.com/scaleapi/pandaset-devkit
+There are some pre-processing steps that are needed before the .pkl dataframes can be read by TypeScript. Future instructions to come on how to set up the pre-processing...
