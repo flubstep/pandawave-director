@@ -158,8 +158,8 @@ export async function loadFrame({
     fragmentShader: FRAGMENT_SHADER,
     uniforms: {
       size: { value: 4.0 },
-      zMin: { value: -2.0 },
-      zMax: { value: 5.0 },
+      zMin: { value: -1.0 },
+      zRange: { value: 2.0 },
       timeStart: { value: timestamp },
       timeDelta: { value: 0.0 },
       lidarOrigin: { value: origin },

@@ -93,9 +93,7 @@ export async function setupThreeScene(
   recordingRenderer.setPixelRatio(1);
 
   // TODO: remove later
-  const mapping = _.range(256).map(() => 25);
-  mapping[30] = 255.0;
-  mapping[31] = 255.0;
+  const mapping = _.range(256).map(() => 255.0);
   updateColorMap(mapping);
 
   async function loadPandaScene(name: string): Promise<void> {
@@ -173,8 +171,8 @@ export async function setupThreeScene(
     autoRotateSpeed: 0.5,
   };
   const shaderParams = {
-    zMin: -2.0,
-    zMax: 5.0,
+    zMin: -1.0,
+    zRange: 2.0,
     lidarSpeed: 120.0,
     decayTime: 0.15,
   };
@@ -264,7 +262,7 @@ export async function setupThreeScene(
     const { frames } = pandaScene;
     for (const frame of frames.children) {
       frame.material.uniforms.zMin.value = shaderParams.zMin;
-      frame.material.uniforms.zMax.value = shaderParams.zMax;
+      frame.material.uniforms.zRange.value = shaderParams.zRange;
       frame.material.uniforms.lidarSpeed.value = shaderParams.lidarSpeed;
       frame.material.uniforms.decayTime.value = shaderParams.decayTime;
     }
@@ -321,7 +319,7 @@ export async function setupThreeScene(
   cameraGui.open();
   const shaderGui = gui.addFolder('Shader Options');
   shaderGui.add(shaderParams, 'zMin', -10.0, 10.0, 0.1).name('Z-Floor').onChange(updateUniforms);
-  shaderGui.add(shaderParams, 'zMax', -10.0, 10.0, 0.1).name('Z-Ceiling').onChange(updateUniforms);
+  shaderGui.add(shaderParams, 'zRange', -10.0, 10.0, 0.1).name('Z-Range').onChange(updateUniforms);
   shaderGui
     .add(shaderParams, 'lidarSpeed', 1.0, 200.0, 1.0)
     .name('Lidar Speed')
